@@ -1,0 +1,43 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v2
+
+    - name: Build Release x64
+      run: msbuild ManualMapInjector.vcxproj /p:Configuration=Release /p:Platform=x64 /v:minimal
+
+    - name: Delete old release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: gh release delete latest --yes --cleanup-tag
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      continue-on-error: true
+
+    - name: Create release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      run: |
+        gh release create latest x64/Release/ManualMapInjector.exe `
+          --title "Latest Build" `
+          --notes "Automated build from commit ${{ github.sha }}" `
+          --latest
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
